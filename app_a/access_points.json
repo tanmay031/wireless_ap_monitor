@@ -1,19 +1,15 @@
 {
     "access_points": [
-        {
-            "ssid": "MyAP",
-            "snr": 82,
-            "channel": 11
-        },
-        {
-            "ssid": "YourAP",
-            "snr": 42,
-            "channel": 6
-        },
-        {
-            "ssid": "HerAP",
-            "snr": 71,
-            "channel": 1
-        }
+      {
+        "ssid": "MyAP",
+        "snr": 82,
+        "channel": 11
+      },
+      {
+        "ssid": "NewAP",
+        "snr": 70,
+        "channel": 3
+      }
     ]
-}
+  }
+  

@@ -1,3 +1,5 @@
+version: '3.8'  # Specify the version of the compose file
+
 services:
   rabbitmq:
     image: rabbitmq:3-management
@@ -6,8 +8,10 @@ services:
       - "5672:5672"
       - "15672:15672"
     environment:
-      RABBITMQ_DEFAULT_USER: user
-      RABBITMQ_DEFAULT_PASS: password
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      RABBITMQ_CONF: |
+        deprecated_features.permit.management_metrics_collection = true
     networks:
       - ap_network
     healthcheck:
@@ -23,8 +27,8 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-    environment:
-      - RABBITMQ_SERVER=rabbitmq
+    env_file:
+      - .env  # Load environment variables from .env file
     volumes:
       - ./app_a/access_points.json:/app/access_points.json
     networks:
@@ -35,8 +39,8 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-    environment:
-      - RABBITMQ_SERVER=rabbitmq
+    env_file:
+      - .env  # Load environment variables from .env file
     networks:
       - ap_network
     deploy:
