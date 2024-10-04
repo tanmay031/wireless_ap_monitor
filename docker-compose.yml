@@ -1,0 +1,47 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: user
+      RABBITMQ_DEFAULT_PASS: password
+    networks:
+      - ap_network
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 5s
+
+  app_a:
+    build: ./app_a
+    container_name: app_a
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - RABBITMQ_SERVER=rabbitmq
+    volumes:
+      - ./app_a/access_points.json:/app/access_points.json
+    networks:
+      - ap_network
+
+  app_b:
+    build: ./app_b
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - RABBITMQ_SERVER=rabbitmq
+    networks:
+      - ap_network
+    deploy:
+      replicas: 3
+
+networks:
+  ap_network:
+    driver: bridge
