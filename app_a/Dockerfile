@@ -5,8 +5,8 @@ FROM python:3.9-slim
 WORKDIR /app
 
 # Copy the Python script and JSON file into the container
-COPY app_a.py /app/app_a.py
-COPY access_points.json /app/access_points.json
+COPY * /app/
+
 
 # Install necessary Python package
 RUN pip install pika

@@ -3,11 +3,12 @@ import time
 import os
 import pika
 import logging
+from config import Config
+
 
 class FileMonitor:
-    def __init__(self, file_path, rabbitmq_server, exchange_name, exchange_type):
+    def __init__(self, file_path, exchange_name, exchange_type):
         self.file_path = file_path
-        self.rabbitmq_server = rabbitmq_server
         self.exchange_name = exchange_name
         self.exchange_type = exchange_type
         self.previous_data = {}
@@ -49,40 +50,54 @@ class FileMonitor:
 
         return changes
 
-    def notify_app_b(self, changes):
-        """Notify App B of the changes by sending data through RabbitMQ."""
-        
-        rabbitmq_user = os.getenv('RABBITMQ_USER')
-        rabbitmq_password = os.getenv('RABBITMQ_PASSWORD')
+    def connect_to_rabbitmq(self):
+        """Establish a connection to RabbitMQ and return the connection object."""
         
         for attempt in range(5):  # Retry up to 5 times
             try:
-                # Connect using the credentials from environment variables
                 connection = pika.BlockingConnection(
                     pika.ConnectionParameters(
-                        host=self.rabbitmq_server,
+                        host=Config.RABBITMQ_SERVER,
                         port=5672,
-                        credentials=pika.PlainCredentials(rabbitmq_user, rabbitmq_password)
+                        credentials=pika.PlainCredentials(Config.RABBITMQ_USER, Config.RABBITMQ_PASSWORD)
                     )
                 )
-                channel = connection.channel()
-
-                # Declare an exchange of type 'fanout'
-                channel.exchange_declare(exchange=self.exchange_name, exchange_type=self.exchange_type)
-
-                for change in changes:
-                    # Publish each change to the exchange
-                    channel.basic_publish(exchange=self.exchange_name, routing_key='', body=change)
-                    logging.info(f"Sent to exchange: {change}")
-
-                # Close the connection
-                connection.close()
-                break  # Exit the retry loop if successful
+                return connection
             except Exception as e:
                 logging.error(f"Failed to connect to RabbitMQ: {e}")
                 time.sleep(5)  # Wait 5 seconds before retrying
+        logging.error("Failed to connect to RabbitMQ after multiple attempts.")
+        return None
+
+    def publish_changes(self, connection, changes):
+        """Publish the changes to the RabbitMQ exchange using an established connection."""
+        
+        try:
+            channel = connection.channel()
+
+            # Declare an exchange of type 'fanout'
+            channel.exchange_declare(exchange=self.exchange_name, exchange_type=self.exchange_type)
+
+            for change in changes:
+                # Publish each change to the exchange
+                channel.basic_publish(exchange=self.exchange_name, routing_key='', body=change)
+                logging.info(f"Sent to exchange: {change}")
+        except Exception as e:
+            logging.error(f"Error while publishing changes: {e}")
+        finally:
+            # Close the connection
+            connection.close()
+    def notify_app_b(self, changes):
+        """Notify App B of the changes by sending data through RabbitMQ."""
+        
+        # Step 1: Establish a connection to RabbitMQ
+        connection = self.connect_to_rabbitmq()
+        
+        # Step 2: Publish changes if connection was successful
+        if connection:
+            self.publish_changes(connection, changes)
         else:
-            logging.error("Failed to connect to RabbitMQ after multiple attempts.")
+            logging.error("Cannot notify App B. No RabbitMQ connection established.")
 
     def monitor_file(self):
         """Monitor the access points JSON file for changes."""
@@ -105,8 +120,7 @@ if __name__ == "__main__":
     # File path to monitor (located in the current directory inside the container)
     FILE_PATH = './access_points.json'
 
-    # RabbitMQ server details
-    RABBITMQ_SERVER = os.getenv('RABBITMQ_SERVER', 'rabbitmq')
+    # Exchange info
     EXCHANGE_NAME = 'ap_changes'
     EXCHANGE_TYPE = 'fanout'  # 'fanout' exchange broadcasts messages to all queues
 
@@ -114,5 +128,5 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
     # Instantiate and run the FileMonitor
-    monitor = FileMonitor(FILE_PATH, RABBITMQ_SERVER, EXCHANGE_NAME, EXCHANGE_TYPE)
+    monitor = FileMonitor(FILE_PATH, EXCHANGE_NAME, EXCHANGE_TYPE)
     monitor.monitor_file()

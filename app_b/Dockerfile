@@ -5,7 +5,7 @@ FROM python:3.9-slim
 WORKDIR /app
 
 # Copy the Python script into the container
-COPY app_b.py /app/app_b.py
+COPY * /app/
 
 # Install necessary Python package
 RUN pip install pika

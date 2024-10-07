@@ -2,23 +2,17 @@ import pika
 import os
 import logging
 import time
+from config import Config
 
-# RabbitMQ server details from environment variables
-RABBITMQ_SERVER = os.getenv('RABBITMQ_SERVER', 'rabbitmq')
-RABBITMQ_USERNAME = os.getenv('RABBITMQ_USER', 'user')  
-RABBITMQ_PASSWORD = os.getenv('RABBITMQ_PASSWORD', 'password')  # Default to 'guest' if not set
-EXCHANGE_NAME = 'ap_changes'
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class RabbitMQListener:
-    def __init__(self, server, exchange_name, username, password, retries=12):
+    def __init__(self, exchange_name, exchange_type, retries=10):
         """Initialize the listener with RabbitMQ connection details."""
-        self.server = server
         self.exchange_name = exchange_name
-        self.username = username
-        self.password = password
+        self.exchange_type = exchange_type
         self.retries = retries
         self.connection = None
         self.channel = None
@@ -35,15 +29,15 @@ class RabbitMQListener:
                 # Establish connection to RabbitMQ
                 self.connection = pika.BlockingConnection(
                     pika.ConnectionParameters(
-                        host=self.server,
+                        host=Config.RABBITMQ_SERVER,
                         port=5672,
-                        credentials=pika.PlainCredentials(self.username, self.password)
+                        credentials=pika.PlainCredentials(Config.RABBITMQ_USER, Config.RABBITMQ_PASSWORD)
                     )
                 )
                 self.channel = self.connection.channel()
 
                 # Declare the exchange
-                self.channel.exchange_declare(exchange=self.exchange_name, exchange_type='fanout')
+                self.channel.exchange_declare(exchange=self.exchange_name, exchange_type=self.exchange_type)
 
                 return True  # Successful connection
             except Exception as e:
@@ -79,11 +73,14 @@ class RabbitMQListener:
                 self.connection.close()
 
 if __name__ == "__main__":
+    
+    # Exchange info
+    EXCHANGE_NAME = 'ap_changes'
+    EXCHANGE_TYPE = 'fanout'  # 'fanout' exchange broadcasts messages to all queues
+    
     # Initialize the listener with credentials from environment variables
     listener = RabbitMQListener(
-        server=RABBITMQ_SERVER, 
         exchange_name=EXCHANGE_NAME, 
-        username=RABBITMQ_USERNAME, 
-        password=RABBITMQ_PASSWORD
+        exchange_type=EXCHANGE_TYPE
     )
     listener.start_listening()
